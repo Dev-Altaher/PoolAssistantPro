@@ -16,74 +16,55 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Download repository
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Install Java
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      # 3. Install Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
         with:
           accept-android-sdk-licenses: true
-          log-accepted-android-sdk-licenses: false
-          packages: |
-            platform-tools
-            platforms;android-35
-            build-tools;35.0.0
 
-      # 4. Install Gradle
+      - name: Accept SDK licenses
+        run: |
+          yes | sdkmanager --licenses || true
+
+      - name: Install SDK packages
+        run: |
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-35"
+          sdkmanager "build-tools;35.0.0"
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
 
-      # 5. Extract Android project
-      - name: Prepare project
+      - name: Extract project
         run: |
-          if [ ! -f PoolAssistantPro_Android_Source.zip ]; then
-            echo "ERROR: Project ZIP not found!"
-            ls -la
-            exit 1
-          fi
-
           mkdir -p build-src
           unzip -q PoolAssistantPro_Android_Source.zip -d build-src
 
-          if [ ! -f build-src/settings.gradle.kts ]; then
-            echo "ERROR: Gradle project not found!"
-            find build-src -maxdepth 3 -type f
-            exit 1
-          fi
+          echo "Project files:"
+          find build-src -maxdepth 4 -type f | head -100
 
-      # 6. Build APK
+          test -f build-src/settings.gradle.kts
+          test -f build-src/app/build.gradle.kts
+
       - name: Build APK
         run: |
-          gradle \
-            --no-daemon \
-            -p build-src \
-            assembleDebug
+          gradle --no-daemon -p build-src assembleDebug
 
-      # 7. Verify APK
       - name: Verify APK
         run: |
-          APK="build-src/app/build/outputs/apk/debug/app-debug.apk"
+          test -s build-src/app/build/outputs/apk/debug/app-debug.apk
 
-          if [ ! -f "$APK" ]; then
-            echo "APK was not generated!"
-            exit 1
-          fi
-
-          ls -lh "$APK"
-
-      # 8. Upload APK
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: PoolAssistantPro-APK
